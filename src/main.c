@@ -21,6 +21,8 @@ void sigint_handler(int signal) {
 
 int main(int argc, char **argv) {
 
+    /****************************** declarations ******************************/
+
     // networking
     int server_fd;      // server socket file descriptor
     int client_fd;      // client socket file descriptor (generic)
@@ -30,7 +32,7 @@ int main(int argc, char **argv) {
     unsigned int client_socket_len = sizeof(client_socket);
 
     // general purpose
-    int i;
+    unsigned int i;
     uint8_t found;
 
     // messages
@@ -38,16 +40,36 @@ int main(int argc, char **argv) {
     unsigned int len = -1;
 
     // select and file descriptors
-    fd_set read_fds;                            // file descriptor reading set (for select)
-    int fd_ready = -1;                          // select result
-    unsigned int client_fd_array[MAX_CLIENTS];  // client file descriptor array
-    int max_fd = -1;                            // max file descriptor value (needed by select)
-    int optval = 1;                             // socket option config value (enable configuration)
-    struct timeval select_to;                   // select timeout structure
+    fd_set read_fds;                    // file descriptor reading set (for select)
+    int fd_ready = -1;                  // select result
+    unsigned int *client_fd_array;      // client file descriptor array
+    int max_fd = -1;                    // max file descriptor value (needed by select)
+    int optval = 1;                     // socket option config value (enable configuration)
+    struct timeval select_to;           // select timeout structure
 
     // device name and metrics
-    char device_name[MAX_CLIENTS][MAX_DEV_NAME_LEN];    // store device names
-    unsigned long message_count[MAX_CLIENTS];           // client messages count
+    char **device_name;                 // store device names
+    unsigned long *message_count;       // client messages count
+
+    // configuration
+    serverConfig config;
+
+    /**************************************************************************/
+
+    // init configuration
+    if ((read_config(&config)) != 0) {
+        printf("Invalid configuration, using default\n");
+    }
+
+    // init dynamic structures which depend on configuration value
+    client_fd_array = (unsigned int*) malloc(config.max_clients * sizeof(unsigned int));
+    message_count   = (unsigned long *) malloc(config.max_clients * sizeof(unsigned long));
+
+    device_name = (char **) malloc(config.max_clients * sizeof(char *));
+    for(i = 0; i < config.max_clients; i++) {
+        device_name[i] = (char *) malloc(MAX_DEV_NAME_LEN * sizeof(char));
+    }
+
 
     // signal handler
     signal(SIGINT, sigint_handler);    // instantiate signal handler
@@ -56,9 +78,9 @@ int main(int argc, char **argv) {
     // init server address info structure
     memset(&server_socket, 0, sizeof(server_socket));
     server_socket.sin_family = AF_INET;
-    server_socket.sin_port = htons(LISTEN_PORT);
-    if(inet_aton(LISTEN_IP, &(server_socket.sin_addr)) == 0) {
-        printf("Invalid listen IP address");
+    server_socket.sin_port = htons(config.listen_port);
+    if(inet_aton(config.listen_addr, &(server_socket.sin_addr)) == 0) {
+        printf("Invalid listen IP address: %s", config.listen_addr);
         exit(EXIT_FAILURE);
     }
 
@@ -66,12 +88,12 @@ int main(int argc, char **argv) {
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));      // allow immediate re-binding of port
     
     // reset client socket file descriptors
-    for(i = 0; i < MAX_CLIENTS; i++) {
+    for(i = 0; i < config.max_clients; i++) {
         client_fd_array[i] = 0;
     }
 
     // reset message count
-    for(i = 0; i < MAX_CLIENTS; i++) {
+    for(i = 0; i < config.max_clients; i++) {
         message_count[i] = 0;
     }
 
@@ -101,7 +123,7 @@ int main(int argc, char **argv) {
         max_fd = server_fd;                 // init max fd to server fd value
 
         // check active client fds
-        for(i = 0; i < MAX_CLIENTS; i++) {
+        for(i = 0; i < config.max_clients; i++) {
             client_fd = client_fd_array[i];
             if(client_fd > 0) {
                 FD_SET(client_fd, &read_fds);
@@ -134,7 +156,7 @@ int main(int argc, char **argv) {
                 // add client file descriptor to first available slot in client_fd_array
                 found = 0;
                 i = 0;
-                while(!found && i < MAX_CLIENTS) {
+                while(!found && i < config.max_clients) {
                     if(client_fd_array[i] == 0) {
                         client_fd_array[i] = client_fd;
                         found = 1;
@@ -150,7 +172,7 @@ int main(int argc, char **argv) {
             }
 
             // scan all client file descriptors to find which one is active
-            for(i = 0; i < MAX_CLIENTS; i++) { 
+            for(i = 0; i < config.max_clients; i++) { 
                 client_fd = client_fd_array[i];
 
                 if(FD_ISSET(client_fd, &read_fds)) {
@@ -161,7 +183,7 @@ int main(int argc, char **argv) {
 
                         // first message from device, set name
                         if(message_count[i] == 0) {
-                            strncpy(device_name[i], buffer, MAX_DEV_NAME_LEN);
+                            strncpy(device_name[i], buffer, MAX_DEV_NAME_LEN - 1);
                         }
                         else {
                             printf("New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
@@ -181,14 +203,14 @@ int main(int argc, char **argv) {
     }
 
     // print message count
-    for(i = 0; i < MAX_CLIENTS; i++) {
+    for(i = 0; i < config.max_clients; i++) {
         if (message_count[i] > 0) {
             printf("Client %d: messages: %lu\n", i, message_count[i]);
         }
     }
 
     // close open client sockets
-    for(i = 0; i < MAX_CLIENTS; i++) {
+    for(i = 0; i < config.max_clients; i++) {
         if (client_fd_array[i] > 0) {
             client_fd = client_fd_array[i];
             printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
@@ -197,6 +219,15 @@ int main(int argc, char **argv) {
     }
 
     close(server_fd);   // close server fd
+
+    // free up memory
+    free(client_fd_array);
+    free(message_count);
+
+    for(i = 0; i < config.max_clients; i++) {
+        free(device_name[i]);
+    }
+    free(device_name);
 
     return EXIT_SUCCESS;
 }

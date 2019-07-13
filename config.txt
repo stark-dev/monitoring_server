@@ -1,0 +1,22 @@
+################################################################################
+# MONITORING SERVER CONFIGURATION
+#
+# Each option can be specified as a pair (KEY, value), separated by one or more
+# whitespace characters.
+#
+# The '#' character can be used to comment lines.
+#
+# The default value is used if the option is either commented or not specified.
+#
+# Further information about available options can be found in the documentation.
+#
+################################################################################
+
+# Maximum number of devices allowed to connect to the server (default: 10)
+# MAX_CLIENTS 10
+
+# Listening port (default: 1234)
+# LISTEN_PORT 1234
+
+# Listening address (default: 0.0.0.0)
+# LISTEN_ADDR 0.0.0.0
