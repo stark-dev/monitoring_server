@@ -87,14 +87,10 @@ int main(int argc, char **argv) {
     server_fd = socket(AF_INET, SOCK_STREAM, 0);    // domain: IPv4, type: stream, protocol: default (TCP)
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));      // allow immediate re-binding of port
     
-    // reset client socket file descriptors
     for(i = 0; i < config.max_clients; i++) {
-        client_fd_array[i] = 0;
-    }
-
-    // reset message count
-    for(i = 0; i < config.max_clients; i++) {
-        message_count[i] = 0;
+        client_fd_array[i] = 0;     // reset client socket file descriptors
+        message_count[i] = 0;       // reset message count
+        strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);   // set default name for generic device
     }
 
     // socket binding and listening
