@@ -6,6 +6,14 @@
 
 volatile sig_atomic_t stop_process;     // global stop flag
 
+unsigned int *client_fd_array;
+
+// configuration
+serverConfig config;
+
+// thread
+pthread_mutex_t *client_fd_array_lock;
+
 /*******************************************************************************
 * signal handler
 *******************************************************************************/
@@ -35,24 +43,25 @@ int main(int argc, char **argv) {
     unsigned int i;
     uint8_t found;
 
+    // thread
+    pthread_t tid;
+    void * result;
+
     // messages
-    char buffer[MAX_MSG_LEN];
-    unsigned int len = -1;
+    // char buffer[MAX_MSG_LEN];
+    // unsigned int len = -1;
 
     // select and file descriptors
     fd_set read_fds;                    // file descriptor reading set (for select)
     int fd_ready = -1;                  // select result
-    unsigned int *client_fd_array;      // client file descriptor array
+    // unsigned int *client_fd_array;      // client file descriptor array
     int max_fd = -1;                    // max file descriptor value (needed by select)
     int optval = 1;                     // socket option config value (enable configuration)
     struct timeval select_to;           // select timeout structure
 
     // device name and metrics
-    char **device_name;                 // store device names
-    unsigned long *message_count;       // client messages count
-
-    // configuration
-    serverConfig config;
+    // char **device_name;                 // store device names
+    // unsigned long *message_count;       // client messages count
 
     /**************************************************************************/
 
@@ -63,13 +72,12 @@ int main(int argc, char **argv) {
 
     // init dynamic structures which depend on configuration value
     client_fd_array = (unsigned int*) malloc(config.max_clients * sizeof(unsigned int));
-    message_count   = (unsigned long *) malloc(config.max_clients * sizeof(unsigned long));
+    // message_count   = (unsigned long *) malloc(config.max_clients * sizeof(unsigned long));
 
-    device_name = (char **) malloc(config.max_clients * sizeof(char *));
-    for(i = 0; i < config.max_clients; i++) {
-        device_name[i] = (char *) malloc(MAX_DEV_NAME_LEN * sizeof(char));
-    }
-
+    // device_name = (char **) malloc(config.max_clients * sizeof(char *));
+    // for(i = 0; i < config.max_clients; i++) {
+    //     device_name[i] = (char *) malloc(MAX_DEV_NAME_LEN * sizeof(char));
+    // }
 
     // signal handler
     signal(SIGINT, sigint_handler);    // instantiate signal handler
@@ -89,8 +97,8 @@ int main(int argc, char **argv) {
     
     for(i = 0; i < config.max_clients; i++) {
         client_fd_array[i] = 0;     // reset client socket file descriptors
-        message_count[i] = 0;       // reset message count
-        strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);   // set default name for generic device
+    //     message_count[i] = 0;       // reset message count
+    //     strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);   // set default name for generic device
     }
 
     // socket binding and listening
@@ -106,11 +114,25 @@ int main(int argc, char **argv) {
 
     printf("Open listening socket on address %s:%d (fd: %d)\n", inet_ntoa(server_socket.sin_addr), ntohs(server_socket.sin_port), server_fd);
 
+
+    // init lock and create thread
+    client_fd_array_lock = (pthread_mutex_t *) malloc(sizeof(pthread_mutex_t));
+    if (!client_fd_array_lock) {
+        perror("Unable to allocate mutex");
+        exit(EXIT_FAILURE);
+    }
+    else
+    {
+        pthread_mutex_init(client_fd_array_lock, NULL);
+    }
+
+    pthread_create(&tid, NULL, connection_handler, NULL);
+
     // main loop
     while(!stop_process) {
 
         // define select timeout
-        select_to.tv_sec = SELECT_TIMEOUT_SEC;
+        select_to.tv_sec = 5;
         select_to.tv_usec = 0;
 
         FD_ZERO(&read_fds);                 // reset read file descriptors
@@ -119,15 +141,15 @@ int main(int argc, char **argv) {
         max_fd = server_fd;                 // init max fd to server fd value
 
         // check active client fds
-        for(i = 0; i < config.max_clients; i++) {
-            client_fd = client_fd_array[i];
-            if(client_fd > 0) {
-                FD_SET(client_fd, &read_fds);
-                if(client_fd > max_fd) {
-                    max_fd = client_fd;     // update max fd value
-                }
-            }
-        }
+        // for(i = 0; i < config.max_clients; i++) {
+        //     client_fd = client_fd_array[i];
+        //     if(client_fd > 0) {
+        //         FD_SET(client_fd, &read_fds);
+        //         if(client_fd > max_fd) {
+        //             max_fd = client_fd;     // update max fd value
+        //         }
+        //     }
+        // }
 
         fd_ready = select(max_fd + 1, &read_fds, NULL, NULL, &select_to);   // 0 -> no read fd active, >0 -> some fds ready, -1 -> error
 
@@ -136,9 +158,9 @@ int main(int argc, char **argv) {
                 perror("Select failed");    
             }
         }
-        else if(fd_ready == 0) {
-            printf("No incoming connections: timeout reached\n");
-        }
+        // else if(fd_ready == 0) {
+        //     printf("No incoming connections: timeout reached\n");
+        // }
         else {
             if FD_ISSET(server_fd, &read_fds) {                             // server socket fd set -> incoming connection
                 // accept and assign new fd to client
@@ -152,6 +174,8 @@ int main(int argc, char **argv) {
                 // add client file descriptor to first available slot in client_fd_array
                 found = 0;
                 i = 0;
+
+                pthread_mutex_lock(client_fd_array_lock);
                 while(!found && i < config.max_clients) {
                     if(client_fd_array[i] == 0) {
                         client_fd_array[i] = client_fd;
@@ -159,15 +183,154 @@ int main(int argc, char **argv) {
                     }
                     i++;
                 }
+                pthread_mutex_unlock(client_fd_array_lock);
 
                 // reached max connections limit, closing new connection
                 if(!found) {
                     printf("Reached client limit\n");
                     close(client_fd);
                 }
-            }
+            // }
 
             // scan all client file descriptors to find which one is active
+            // for(i = 0; i < config.max_clients; i++) { 
+            //     client_fd = client_fd_array[i];
+
+            //     if(FD_ISSET(client_fd, &read_fds)) {
+            //         len = (unsigned int) read(client_fd, buffer, sizeof(buffer) - 1);      // read data
+
+            //         if(len > 0) {                                           // new data available
+            //             buffer[len] = '\0';                                 // add buffer terminator char
+
+            //             // first message from device, set name
+            //             if(message_count[i] == 0) {
+            //                 strncpy(device_name[i], buffer, MAX_DEV_NAME_LEN - 1);
+            //             }
+            //             else {
+            //                 printf("New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
+            //             }
+            //             message_count[i]++;                                 // increment message count
+            //         }
+            //         else {                                                  // client closed connection
+            //             printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
+            //             close(client_fd);
+
+            //             message_count[i] = 0;                               // reset message count for current client
+            //             client_fd_array[i] = 0;                             // reset file descriptor value
+            //         }
+            //     }
+            }
+        }
+    }
+
+    // print message count
+    // for(i = 0; i < config.max_clients; i++) {
+    //     if (message_count[i] > 0) {
+    //         printf("Client %d: messages: %lu\n", i, message_count[i]);
+    //     }
+    // }
+
+    // // close open client sockets
+    // for(i = 0; i < config.max_clients; i++) {
+    //     if (client_fd_array[i] > 0) {
+    //         client_fd = client_fd_array[i];
+    //         printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
+    //         close(client_fd);
+    //     }
+    // }
+
+    pthread_join(tid, &result);
+
+    pthread_mutex_destroy(client_fd_array_lock);
+    free(client_fd_array_lock);
+
+    close(server_fd);   // close server fd
+
+    // free up memory
+    free(client_fd_array);
+    // free(message_count);
+
+    // for(i = 0; i < config.max_clients; i++) {
+    //     free(device_name[i]);
+    // }
+    // free(device_name);
+
+    return EXIT_SUCCESS;
+}
+
+
+void *connection_handler() {
+
+    /****************************** declarations ******************************/
+
+    // networking
+    int client_fd;                      // client socket file descriptor (generic)
+
+    // device name and metrics
+    char **device_name;                 // store device names
+    unsigned long *message_count;       // client messages count
+
+    // select and file descriptors
+    fd_set read_fds;                    // file descriptor reading set (for select)
+    int fd_ready = -1;                  // select result
+    int max_fd = -1;                    // max file descriptor value (needed by select)
+    struct timeval select_to;           // select timeout structure
+
+    // messages
+    char buffer[MAX_MSG_LEN];
+    unsigned int len = -1;
+
+    // general purpose
+    unsigned int i;
+
+    /**************************************************************************/
+
+    message_count   = (unsigned long *) malloc(config.max_clients * sizeof(unsigned long));
+    device_name = (char **) malloc(config.max_clients * sizeof(char *));
+    for(i = 0; i < config.max_clients; i++) {
+        device_name[i] = (char *) malloc(MAX_DEV_NAME_LEN * sizeof(char));
+    }
+
+    for(i = 0; i < config.max_clients; i++) {
+        message_count[i] = 0;       // reset message count
+        strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);   // set default name for generic device
+    }
+    
+    while(!stop_process) {
+
+        // define select timeout
+        select_to.tv_sec = 1;
+        select_to.tv_usec = 0;
+
+        FD_ZERO(&read_fds);                 // reset read file descriptors
+
+        // check active client fds
+        pthread_mutex_lock(client_fd_array_lock);
+        for(i = 0; i < config.max_clients; i++) {
+            client_fd = client_fd_array[i];
+            if(client_fd > 0) {
+                FD_SET(client_fd, &read_fds);
+                if(client_fd > max_fd) {
+                    max_fd = client_fd;     // update max fd value
+                }
+            }
+        }
+        pthread_mutex_unlock(client_fd_array_lock);
+
+        fd_ready = select(max_fd + 1, &read_fds, NULL, NULL, &select_to);   // 0 -> no read fd active, >0 -> some fds ready, -1 -> error
+
+        if(fd_ready < 0) {
+            if (errno != EINTR) {
+                perror("Select failed");    
+            }
+        }
+        // else if(fd_ready == 0) {
+        //     printf("No incoming connections: timeout reached\n");
+        // }
+        else {
+
+            // scan all client file descriptors to find which one is active
+            pthread_mutex_lock(client_fd_array_lock);
             for(i = 0; i < config.max_clients; i++) { 
                 client_fd = client_fd_array[i];
 
@@ -180,6 +343,7 @@ int main(int argc, char **argv) {
                         // first message from device, set name
                         if(message_count[i] == 0) {
                             strncpy(device_name[i], buffer, MAX_DEV_NAME_LEN - 1);
+                            printf("Registered new device %s on fd = %d\n", device_name[i], client_fd);
                         }
                         else {
                             printf("New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
@@ -195,10 +359,10 @@ int main(int argc, char **argv) {
                     }
                 }
             }
+            pthread_mutex_unlock(client_fd_array_lock);
         }
     }
 
-    // print message count
     for(i = 0; i < config.max_clients; i++) {
         if (message_count[i] > 0) {
             printf("Client %d: messages: %lu\n", i, message_count[i]);
@@ -206,6 +370,8 @@ int main(int argc, char **argv) {
     }
 
     // close open client sockets
+
+    pthread_mutex_lock(client_fd_array_lock);
     for(i = 0; i < config.max_clients; i++) {
         if (client_fd_array[i] > 0) {
             client_fd = client_fd_array[i];
@@ -213,11 +379,8 @@ int main(int argc, char **argv) {
             close(client_fd);
         }
     }
+    pthread_mutex_unlock(client_fd_array_lock);
 
-    close(server_fd);   // close server fd
-
-    // free up memory
-    free(client_fd_array);
     free(message_count);
 
     for(i = 0; i < config.max_clients; i++) {
@@ -225,5 +388,8 @@ int main(int argc, char **argv) {
     }
     free(device_name);
 
-    return EXIT_SUCCESS;
+    printf("Closing thread\n");
+
+    return NULL;
+
 }
