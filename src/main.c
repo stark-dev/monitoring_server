@@ -50,6 +50,9 @@ int main(int argc, char **argv) {
 
     // device name and metrics
     char **device_name;                 // store device names
+    char *token = NULL;
+    char delim[] = " \r\n";             // split on CR, LN
+
     unsigned long *message_count;       // client messages count
     uint8_t *device_init;               // initialisation flag for each device
     FILE **log_file_ptr;                // file pointer array
@@ -190,10 +193,10 @@ int main(int argc, char **argv) {
                     if(len > 0) {                                           // new data available
                         // first message from device, set name
                         if(!device_init[i]) {
-                            rd_buffer[len] = '\0';                          // add buffer terminator char
-                            printf("Device on fd %d registered as %s\n", client_fd, (char *) rd_buffer);
+                            token = strtok((char *) rd_buffer, delim);      // remove trailing CR/LF
+                            printf("Device on fd %d registered as %s\n", client_fd, token);
 
-                            strncpy(device_name[i], (char *) rd_buffer, MAX_DEV_NAME_LEN - 1);
+                            strncpy(device_name[i], token, MAX_DEV_NAME_LEN - 1);
                             device_init[i] = 1;
                             message_count[i] = 0;                           // reset message count for current client
 
