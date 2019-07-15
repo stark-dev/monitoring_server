@@ -9,10 +9,12 @@ set(CMAKE_C_FLAGS "-Wall -Wextra -Wpedantic")
 
 find_package (Threads REQUIRED)
 
-add_library(serverConfig STATIC src/serverConfig.c)
+add_library(logger STATIC src/logger.c)
 add_library(rw_utils STATIC src/rw_utils.c)
+add_library(serverConfig STATIC src/serverConfig.c)
 
 add_executable(monitoring_server src/main.c)
+target_link_libraries(monitoring_server logger)
 target_link_libraries(monitoring_server rw_utils)
 target_link_libraries(monitoring_server serverConfig)
 

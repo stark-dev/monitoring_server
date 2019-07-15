@@ -25,6 +25,7 @@
 #include <sys/types.h>
 
 /* local includes */
+#include "logger.h"
 #include "rw_utils.h"
 #include "serverConfig.h"
 
