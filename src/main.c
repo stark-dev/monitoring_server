@@ -63,10 +63,15 @@ int main(int argc, char **argv) {
 
     /**************************************************************************/
 
+    // start system logger and register as 'server'
+    open_syslog("server");
+
     // init configuration
     if ((read_config(&config)) != 0) {
         user_log(LOG_WARNING, "Invalid configuration, using default\n");
     }
+
+    set_log_level(config.log_level);
 
     // create log folder
     if((create_log_folder(config.log_folder)) == -1) {
@@ -211,7 +216,7 @@ int main(int argc, char **argv) {
                             }
                         }
                         else {
-                            user_log(LOG_INFO, "New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
+                            user_log(LOG_DEBUG, "New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
                             // read 4 bytes data in big endian format from read buffer
                             if((read_32((void *) rd_buffer, &data, BE)) != sizeof(data)) {
                                 user_log(LOG_WARNING, "Invalid data length\n");
@@ -265,6 +270,8 @@ int main(int argc, char **argv) {
     free(device_name);
     free(device_init);
     free(log_file_ptr);
+
+    close_syslog();
 
     return EXIT_SUCCESS;
 }
