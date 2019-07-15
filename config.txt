@@ -23,3 +23,6 @@
 
 # Log folder absolute or relative path (default: log)
 # LOG_FOLDER log
+
+# Log level verbosity (POSIX) from 0 to 7 (default: 7 - LOG_DEBUG)
+# LOG_LEVEL 7

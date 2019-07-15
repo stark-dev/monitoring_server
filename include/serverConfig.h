@@ -41,6 +41,7 @@ typedef struct serverConfig {
     unsigned short  listen_port;
     char            listen_addr[ADDR_SIZE];
     char            log_folder[MAX_LOG_FOLDER_LEN];
+    unsigned short  log_level;
 } serverConfig;
 
 /*******************************************************************************

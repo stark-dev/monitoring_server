@@ -9,6 +9,7 @@ void init_config(serverConfig *cfg) {
     cfg->listen_port = 1234;
     strncpy(cfg->listen_addr, "0.0.0.0", ADDR_SIZE - 1);
     strncpy(cfg->log_folder, "log", MAX_LOG_FOLDER_LEN - 1);
+    cfg->log_level = LOG_DEBUG;
 
     return;
 }
@@ -138,7 +139,7 @@ int check_pair(serverConfig *cfg, const char *key_p, const char *value_p) {
         }
         else {
             cfg->max_clients = u_value;
-            user_log(LOG_INFO, "Set option %s\t%s\n", key, value);
+            user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
         }
     }   // check listen port opition
     else if(strcmp(key, "LISTEN_PORT") == 0) {
@@ -149,16 +150,27 @@ int check_pair(serverConfig *cfg, const char *key_p, const char *value_p) {
         }
         else {
             cfg->listen_port = (unsigned short) u_value;
-            user_log(LOG_INFO, "Set option %s\t%s\n", key, value);
+            user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
         }
     }   // check listen addr opition
     else if(strcmp(key, "LISTEN_ADDR") == 0) {  // address value is checked by inet_aton
         strncpy(cfg->listen_addr, value, ADDR_SIZE - 1);
-        user_log(LOG_INFO, "Set option %s\t%s\n", key, value);
+        user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
     }
     else if(strcmp(key, "LOG_FOLDER") == 0) {
         strncpy(cfg->log_folder, value, MAX_LOG_FOLDER_LEN - 1);
-        user_log(LOG_INFO, "Set option %s\t%s\n", key, value);
+        user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+    }
+    else if(strcmp(key, "LOG_LEVEL") == 0) {
+        u_value = (unsigned int) atoi(value);
+        if(u_value > LOG_DEBUG) {
+            user_log(LOG_ERR, "Invalid value for log_level option.\n");
+            ret_value = RET_ERROR;
+        }
+        else {
+            cfg->log_level = (unsigned short) u_value;
+            user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+        }
     }
     else {  // no valid option
         ret_value = RET_ERROR;
