@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.9)
 project (monitoring_server)
 
 set(monitoring_server_VERSION_MAJOR 0)
-set(monitoring_server_VERSION_MINOR 4)
+set(monitoring_server_VERSION_MINOR 5)
 
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_FLAGS "-Wall -Wextra -Wpedantic")
