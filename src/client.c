@@ -30,21 +30,28 @@ int main(int argc, char **argv) {
     // threads
     int n_threads = 1;
     pthread_t *tid_array = NULL;
+    thread_params *tparams = NULL;
 
     void* result;
+
+    // connection
+    char address[16] = DEST_ADDR;
+    unsigned short port = DEST_PORT;
 
     // general purpose
     int i;
 
     
     /**************************************************************************/
-    if(argc < 2) {
-        printf("Invalid number of arguments.\nUsage: ./client <n>\n\n");
+    if(argc < 4) {
+        printf("Invalid number of arguments.\nUsage: ./client <n> <addr> <port>\n\n");
         exit(EXIT_FAILURE);
     }
 
     // get number of threads to spawn
     n_threads = atoi(argv[1]);
+    strncpy(address, argv[2], 15);
+    port = atoi(argv[3]);
 
     if(n_threads > MAX_CLIENTS) {       // limit number of clients (only for test purpose)
         n_threads = MAX_CLIENTS;
@@ -57,6 +64,7 @@ int main(int argc, char **argv) {
 
     // instantiate thread ids array
     tid_array = malloc(n_threads * sizeof(pthread_t));
+    tparams = malloc(n_threads * sizeof(thread_params));
 
     if(tid_array == NULL) { 
         perror("malloc()");
@@ -65,7 +73,11 @@ int main(int argc, char **argv) {
 
     // release threads
     for(i = 0; i < n_threads; i++) {
-        pthread_create(&(tid_array[i]), NULL, sender, (void *)&(ports[i]));
+        strncpy(tparams[i].dest_addr, address, 15);
+        tparams[i].dest_port = (unsigned short) port;
+        tparams[i].thread_id = (unsigned int) i;
+
+        pthread_create(&(tid_array[i]), NULL, sender, (void *)&(tparams[i]));
     }
 
     // join threads
@@ -74,6 +86,7 @@ int main(int argc, char **argv) {
     }
 
     free(tid_array);
+    free(tparams);
 
     return EXIT_SUCCESS;
 }
@@ -89,9 +102,9 @@ void *sender(void *p) {
     int client_fd;                      // client socket file descriptor (generic)
     struct sockaddr_in socket_info;     // server info
 
-    unsigned short port = *((unsigned short *) p);
+    thread_params tp = *((thread_params *) p); 
 
-    char device_name[MAX_DEV_NAME_LEN]; // device name (dev_<port>)
+    char device_name[MAX_DEV_NAME_LEN]; // device name (dev_<id>)
 
     uint8_t buffer_tx[MAX_MSG_LEN];     // tx buffer
 
@@ -105,54 +118,52 @@ void *sender(void *p) {
 
     srand(time(NULL));  // random seed
 
+    printf("Thread %lu: dest addr %s - dest port %d - device id %d\n", pthread_self(), tp.dest_addr, tp.dest_port, tp.thread_id);
+
     // init server address info structure
     memset(&socket_info, 0, sizeof(socket_info));
     socket_info.sin_family = AF_INET;
-    socket_info.sin_port = htons(DEST_PORT);
-    if(inet_aton(DEST_ADDR, &(socket_info.sin_addr)) == 0) {
-        printf("Invalid destination IP address");
+    socket_info.sin_port = htons(tp.dest_port);
+    if(inet_aton(tp.dest_addr, &(socket_info.sin_addr)) == 0) {
+        printf("Invalid destination IP address\n");
         return NULL;
     }
 
     // open socket
     client_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-    printf("PORT: %d - FD: %d\n", port, client_fd);
-
     // connect to server
     if(connect(client_fd, (struct sockaddr*)&socket_info, sizeof(socket_info)) == -1) {
         perror("connect");
     }
     else {
-        printf("Thread %lu connected to %s:%d\n", pthread_self(), DEST_ADDR, DEST_PORT);
+        printf("Thread %lu: connected to %s:%d\n", pthread_self(), tp.dest_addr, tp.dest_port);
         // create device name
-        snprintf(device_name, MAX_DEV_NAME_LEN - 1, "dev_%d", port);
-        printf("Sending device name %s on port %d\n", device_name, port);
+        snprintf(device_name, MAX_DEV_NAME_LEN - 1, "dev_%d", tp.thread_id);
+        printf("Thread %lu: sending device name %s\n", pthread_self(), device_name);
 
         // evaluate delay between messages
         delay = rand() % 10 + 1; // min 1 sec, max 10 secs
-        printf("Set delay to %d seconds on port %d\n", delay, port);
+        printf("Thread %lu: set delay to %d seconds on device %d\n", pthread_self(), delay, tp.thread_id);
         
         // send device name to server
         wr_count = send(client_fd, device_name, strlen(device_name), 0);
 
-        sleep(delay);
-
         while(!stop_process && wr_count > 0) {
+            sleep(delay);
+            
             // create fake measure
             data = rand() % 10;
 
             // write 4 bytes in big endian format on tx buffer
             if((write_32(&data, (void *) buffer_tx, BE)) != sizeof(uint32_t)) {
-                printf("Error while writing data\n");
+                printf("Thread %lu: error while writing data\n", pthread_self());
             }
             else {
                 // write data to server
                 wr_count = send(client_fd, buffer_tx, 4, 0);
-                printf("Write %d bytes on fd %d\n", wr_count, client_fd);
+                printf("Thread %lu: write %d bytes on device %d (fd %d)\n", pthread_self(), wr_count, tp.thread_id, client_fd);
             }
-
-            sleep(delay);
         }
 
     }
@@ -160,7 +171,7 @@ void *sender(void *p) {
     // close socket descriptor
     close(client_fd);
 
-    printf("Exiting thread (port %d)...\n", port);
+    printf("Thread %lu: exit\n", pthread_self());
 
-    return NULL;
+    pthread_exit(NULL);
 }
