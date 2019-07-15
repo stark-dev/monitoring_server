@@ -36,7 +36,8 @@ int main(int argc, char **argv) {
     uint8_t found;
 
     // messages
-    char buffer[MAX_MSG_LEN];
+    uint8_t rd_buffer[MAX_MSG_LEN];     // read buffer
+    uint32_t data;                      // temporary data
     unsigned int len = -1;
 
     // select and file descriptors
@@ -184,15 +185,15 @@ int main(int argc, char **argv) {
                 client_fd = client_fd_array[i];
 
                 if(FD_ISSET(client_fd, &read_fds)) {
-                    len = (unsigned int) read(client_fd, buffer, sizeof(buffer) - 1);      // read data
+                    len = (unsigned int) read(client_fd, rd_buffer, MAX_MSG_LEN - 1); // read data
 
                     if(len > 0) {                                           // new data available
                         // first message from device, set name
                         if(!device_init[i]) {
-                            buffer[len] = '\0';                             // add buffer terminator char
-                            printf("Device on fd %d registered as %s\n", client_fd, buffer);
+                            rd_buffer[len] = '\0';                          // add buffer terminator char
+                            printf("Device on fd %d registered as %s\n", client_fd, (char *) rd_buffer);
 
-                            strncpy(device_name[i], buffer, MAX_DEV_NAME_LEN - 1);
+                            strncpy(device_name[i], (char *) rd_buffer, MAX_DEV_NAME_LEN - 1);
                             device_init[i] = 1;
                             message_count[i] = 0;                           // reset message count for current client
 
@@ -206,8 +207,14 @@ int main(int argc, char **argv) {
                         }
                         else {
                             printf("New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
-                            // write to device log file
-                            fprintf(log_file_ptr[i], "timestamp: %lu - value: %u\n", (unsigned long) time(NULL), 0);
+                            // read 4 bytes data in big endian format from read buffer
+                            if((read_32((void *) rd_buffer, &data, BE)) != sizeof(data)) {
+                                printf("Invalid data length\n");
+                            }
+                            else {
+                                // write to device log file
+                                fprintf(log_file_ptr[i], "timestamp: %lu - value: %u\n", (unsigned long) time(NULL), data);
+                            }
                             message_count[i]++;                             // increment message count
                         }
                     }

@@ -99,6 +99,8 @@ void *sender(void *p) {
 
     int delay = 4;                      // sleep delay (random)
 
+    uint32_t data;                      // random data
+
     /**************************************************************************/
 
     srand(time(NULL));  // random seed
@@ -137,16 +139,18 @@ void *sender(void *p) {
         sleep(delay);
 
         while(!stop_process && wr_count > 0) {
-            // create fake message
-            buffer_tx[0] = rand() % 256;
-            buffer_tx[1] = rand() % 256;
-            buffer_tx[2] = rand() % 256;
-            buffer_tx[3] = rand() % 256;
+            // create fake measure
+            data = rand() % 10;
 
-            // write data to server
-            wr_count = send(client_fd, buffer_tx, 4, 0);
-
-            printf("Write %d bytes on fd %d\n", wr_count, client_fd);
+            // write 4 bytes in big endian format on tx buffer
+            if((write_32(&data, (void *) buffer_tx, BE)) != sizeof(uint32_t)) {
+                printf("Error while writing data\n");
+            }
+            else {
+                // write data to server
+                wr_count = send(client_fd, buffer_tx, 4, 0);
+                printf("Write %d bytes on fd %d\n", wr_count, client_fd);
+            }
 
             sleep(delay);
         }
