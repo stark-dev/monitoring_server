@@ -2,6 +2,32 @@
 #define MAIN_H
 
 /*******************************************************************************
+* libraries
+*******************************************************************************/
+
+/* C standard libraries */
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <signal.h>
+#include <errno.h>
+#include <time.h>
+
+/* networking libraries */
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
+/* file handling libraries */
+#include <sys/stat.h>
+#include <sys/types.h>
+
+/* local includes */
+#include "serverConfig.h"
+
+/*******************************************************************************
 * constants
 *******************************************************************************/
 
@@ -14,26 +40,13 @@
 /* devices */
 #define MAX_DEV_NAME_LEN 100    // max device name len accepted
 
+/* logger */
+#define MAX_LOG_FILE_LEN    MAX_LOG_FOLDER_LEN + MAX_DEV_NAME_LEN + 5
 
 /*******************************************************************************
-* libraries
+* functions
 *******************************************************************************/
 
-/* C standard libraries */
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <signal.h>
-#include <errno.h>
-
-/* networking libraries */
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-
-/* local includes */
-#include "serverConfig.h"
+int create_log_folder(const char *name);
 
 #endif

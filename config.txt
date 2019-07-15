@@ -20,3 +20,6 @@
 
 # Listening address (default: 0.0.0.0)
 # LISTEN_ADDR 0.0.0.0
+
+# Log folder absolute or relative path (default: log)
+# LOG_FOLDER log

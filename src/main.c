@@ -50,6 +50,9 @@ int main(int argc, char **argv) {
     // device name and metrics
     char **device_name;                 // store device names
     unsigned long *message_count;       // client messages count
+    uint8_t *device_init;               // initialisation flag for each device
+    FILE **log_file_ptr;                // file pointer array
+    char log_file_name[MAX_LOG_FILE_LEN];
 
     // configuration
     serverConfig config;
@@ -61,9 +64,16 @@ int main(int argc, char **argv) {
         printf("Invalid configuration, using default\n");
     }
 
+    // create log folder
+    if((create_log_folder(config.log_folder)) == -1) {
+        exit(EXIT_FAILURE);
+    }
+
     // init dynamic structures which depend on configuration value
     client_fd_array = (unsigned int*) malloc(config.max_clients * sizeof(unsigned int));
     message_count   = (unsigned long *) malloc(config.max_clients * sizeof(unsigned long));
+    device_init     = (uint8_t *) malloc(config.max_clients * sizeof(uint8_t));
+    log_file_ptr    = (FILE **) malloc(config.max_clients * sizeof(FILE *));
 
     device_name = (char **) malloc(config.max_clients * sizeof(char *));
     for(i = 0; i < config.max_clients; i++) {
@@ -90,6 +100,8 @@ int main(int argc, char **argv) {
     for(i = 0; i < config.max_clients; i++) {
         client_fd_array[i] = 0;     // reset client socket file descriptors
         message_count[i] = 0;       // reset message count
+        device_init[i] = 0;         // reset device init flag
+        log_file_ptr[i] = NULL;     // init log file pointers
         strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);   // set default name for generic device
     }
 
@@ -175,23 +187,38 @@ int main(int argc, char **argv) {
                     len = (unsigned int) read(client_fd, buffer, sizeof(buffer) - 1);      // read data
 
                     if(len > 0) {                                           // new data available
-                        buffer[len] = '\0';                                 // add buffer terminator char
-
                         // first message from device, set name
-                        if(message_count[i] == 0) {
+                        if(!device_init[i]) {
+                            buffer[len] = '\0';                             // add buffer terminator char
+                            printf("Device on fd %d registered as %s\n", client_fd, buffer);
+
                             strncpy(device_name[i], buffer, MAX_DEV_NAME_LEN - 1);
+                            device_init[i] = 1;
+                            message_count[i] = 0;                           // reset message count for current client
+
+                            // create log file for connected device
+                            snprintf(log_file_name, MAX_LOG_FILE_LEN - 1, "%s/%s.log", config.log_folder, device_name[i]);
+                            log_file_ptr[i] = fopen(log_file_name, "a");
+                            if(log_file_ptr[i] == NULL) {
+                                perror("Unable to open log file");
+                                exit(EXIT_FAILURE);
+                            }
                         }
                         else {
                             printf("New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
+                            // write to device log file
+                            fprintf(log_file_ptr[i], "timestamp: %lu - value: %u\n", (unsigned long) time(NULL), 0);
+                            message_count[i]++;                             // increment message count
                         }
-                        message_count[i]++;                                 // increment message count
                     }
                     else {                                                  // client closed connection
                         printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
                         close(client_fd);
 
-                        message_count[i] = 0;                               // reset message count for current client
+                        device_init[i] = 0;                                 // reset device init flag
                         client_fd_array[i] = 0;                             // reset file descriptor value
+                        fclose(log_file_ptr[i]);                            // close log file and reset file pointer
+                        log_file_ptr[i] = NULL;
                     }
                 }
             }
@@ -211,6 +238,10 @@ int main(int argc, char **argv) {
             client_fd = client_fd_array[i];
             printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
             close(client_fd);
+            device_init[i] = 0;
+            client_fd_array[i] = 0;
+            fclose(log_file_ptr[i]);                            // close log file and reset file pointer
+            log_file_ptr[i] = NULL;
         }
     }
 
@@ -224,6 +255,36 @@ int main(int argc, char **argv) {
         free(device_name[i]);
     }
     free(device_name);
+    free(device_init);
+    free(log_file_ptr);
 
     return EXIT_SUCCESS;
+}
+
+/*******************************************************************************
+* create log folder
+*******************************************************************************/
+
+int create_log_folder(const char *name) {
+
+    char folder_name[MAX_LOG_FOLDER_LEN];
+    struct stat st = {0};
+    int ret = 0;
+
+    strncpy(folder_name, name, MAX_LOG_FOLDER_LEN - 1);
+
+    // create log folder if does not exits
+    if(stat(folder_name, &st) == -1) {
+        printf("Creating log folder '%s'\n", folder_name);
+        ret = mkdir(folder_name, S_IRWXU | S_IRWXG | S_IROTH);
+    }
+    else {
+        printf("Log folder '%s' exists\n", folder_name);
+    }
+
+    if(ret == -1) {
+        perror("mkdir");
+    }
+
+    return ret;
 }

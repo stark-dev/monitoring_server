@@ -8,6 +8,7 @@ void init_config(serverConfig *cfg) {
     cfg->max_clients = 10;
     cfg->listen_port = 1234;
     strncpy(cfg->listen_addr, "0.0.0.0", ADDR_SIZE - 1);
+    strncpy(cfg->log_folder, "log", MAX_LOG_FOLDER_LEN - 1);
 
     return;
 }
@@ -153,6 +154,10 @@ int check_pair(serverConfig *cfg, const char *key_p, const char *value_p) {
     }   // check listen addr opition
     else if(strcmp(key, "LISTEN_ADDR") == 0) {  // address value is checked by inet_aton
         strncpy(cfg->listen_addr, value, ADDR_SIZE - 1);
+        printf("Set option %s : %s\n", key, value);
+    }
+    else if(strcmp(key, "LOG_FOLDER") == 0) {
+        strncpy(cfg->log_folder, value, MAX_LOG_FOLDER_LEN - 1);
         printf("Set option %s : %s\n", key, value);
     }
     else {  // no valid option
