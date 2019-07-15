@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.9)
 project (monitoring_server)
 
 set(monitoring_server_VERSION_MAJOR 0)
-set(monitoring_server_VERSION_MINOR 2)
+set(monitoring_server_VERSION_MINOR 3)
 
 set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_FLAGS "-Wall -Wextra -Wpedantic")
@@ -23,5 +23,8 @@ add_executable(monitoring_server src/main.c)
 # add_dependencies(monitoring_server )
 target_link_libraries(monitoring_server serverConfig)
 # target_link_libraries(monitoring_server -lutils)
+
+add_executable(client src/client.c)
+target_link_libraries(client pthread)
 
 # install(TARGETS monitoring_server DESTINATION bin)
