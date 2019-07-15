@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
     // device name and metrics
     char **device_name;                 // store device names
     char *token = NULL;
-    char delim[] = " \r\n";             // split on CR, LN
+    const char *delim = " \r\n\0";      // split on CR, LN
 
     unsigned long *message_count;       // client messages count
     uint8_t *device_init;               // initialisation flag for each device
@@ -84,6 +84,8 @@ int main(int argc, char **argv) {
         device_name[i] = (char *) malloc(MAX_DEV_NAME_LEN * sizeof(char));
     }
 
+    // clear read buffer
+    memset((void* ) rd_buffer, 0, MAX_MSG_LEN);
 
     // signal handler
     signal(SIGINT, sigint_handler);    // instantiate signal handler
