@@ -11,7 +11,7 @@ volatile sig_atomic_t stop_process;     // global stop flag
 *******************************************************************************/
 
 void sigint_handler(int signal) {
-    printf("Caugth signal %d: exiting client...\n", signal);
+    user_log(LOG_INFO, "Exiting client...\n", signal);
     stop_process = 1;
 }
 
@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
 
     // init configuration
     if ((read_config(&config)) != 0) {
-        printf("Invalid configuration, using default\n");
+        user_log(LOG_WARNING, "Invalid configuration, using default\n");
     }
 
     // create log folder
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
     server_socket.sin_family = AF_INET;
     server_socket.sin_port = htons(config.listen_port);
     if(inet_aton(config.listen_addr, &(server_socket.sin_addr)) == 0) {
-        printf("Invalid listen IP address: %s", config.listen_addr);
+        user_log(LOG_ERR, "Invalid listen IP address: %s\n", config.listen_addr);
         exit(EXIT_FAILURE);
     }
 
@@ -111,16 +111,16 @@ int main(int argc, char **argv) {
 
     // socket binding and listening
     if(bind(server_fd, (struct sockaddr*)&(server_socket), sizeof(server_socket)) == -1) {
-        perror("bind()");
+        user_log(LOG_ERR, "Socket bind failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     if(listen(server_fd, MAX_INCOMING) != 0) {
-        perror("listen()");
+        user_log(LOG_ERR, "Socket listen failed: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
     }
 
-    printf("Open listening socket on address %s:%d (fd: %d)\n", inet_ntoa(server_socket.sin_addr), ntohs(server_socket.sin_port), server_fd);
+    user_log(LOG_INFO, "Open listening socket on address %s:%d (fd: %d)\n", inet_ntoa(server_socket.sin_addr), ntohs(server_socket.sin_port), server_fd);
 
     // main loop
     while(!stop_process) {
@@ -149,21 +149,21 @@ int main(int argc, char **argv) {
 
         if(fd_ready < 0) {
             if (errno != EINTR) {
-                perror("Select failed");    
+                user_log(LOG_ERR, "Select failed: %s\n", strerror(errno));
             }
         }
         else if(fd_ready == 0) {
-            printf("No incoming connections: timeout reached\n");
+            user_log(LOG_INFO, "No incoming connections: select timeout reached\n");
         }
         else {
             if FD_ISSET(server_fd, &read_fds) {                             // server socket fd set -> incoming connection
                 // accept and assign new fd to client
                 if((client_fd = accept(server_fd, (struct sockaddr*)&client_socket, &client_socket_len)) < 0) {
-                    perror("Accept failed");
+                    user_log(LOG_ERR, "Socket accept failed: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
 
-                printf("New connection from %s:%d (fd %d)\n", inet_ntoa(client_socket.sin_addr), ntohs(client_socket.sin_port),  client_fd);
+                user_log(LOG_INFO, "New connection from %s:%d (fd %d)\n", inet_ntoa(client_socket.sin_addr), ntohs(client_socket.sin_port),  client_fd);
 
                 // add client file descriptor to first available slot in client_fd_array
                 found = 0;
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
 
                 // reached max connections limit, closing new connection
                 if(!found) {
-                    printf("Reached client limit\n");
+                    user_log(LOG_WARNING, "Reached client limit\n");
                     close(client_fd);
                 }
             }
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
                         // first message from device, set name
                         if(!device_init[i]) {
                             token = strtok((char *) rd_buffer, delim);      // remove trailing CR/LF
-                            printf("Device on fd %d registered as %s\n", client_fd, token);
+                            user_log(LOG_INFO, "Device on fd %d registered as %s\n", client_fd, token);
 
                             strncpy(device_name[i], token, MAX_DEV_NAME_LEN - 1);
                             device_init[i] = 1;
@@ -204,15 +204,15 @@ int main(int argc, char **argv) {
                             snprintf(log_file_name, MAX_LOG_FILE_LEN - 1, "%s/%s.log", config.log_folder, device_name[i]);
                             log_file_ptr[i] = fopen(log_file_name, "a");
                             if(log_file_ptr[i] == NULL) {
-                                perror("Unable to open log file");
+                                user_log(LOG_ERR, "Unable to open log file %s: %s\n", log_file_name, strerror(errno));
                                 exit(EXIT_FAILURE);
                             }
                         }
                         else {
-                            printf("New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
+                            user_log(LOG_INFO, "New message of size %d from %s (fd = %d)\n", len, device_name[i], client_fd);
                             // read 4 bytes data in big endian format from read buffer
                             if((read_32((void *) rd_buffer, &data, BE)) != sizeof(data)) {
-                                printf("Invalid data length\n");
+                                user_log(LOG_WARNING, "Invalid data length\n");
                             }
                             else {
                                 // write to device log file
@@ -222,8 +222,10 @@ int main(int argc, char **argv) {
                         }
                     }
                     else {                                                  // client closed connection
-                        printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
                         close(client_fd);
+
+                        user_log(LOG_INFO, "Closing socket on fd: %d\n", client_fd);
+                        user_log(LOG_INFO, "Received %lu messages from %s\n", message_count[i], device_name[i]);
 
                         device_init[i] = 0;                                 // reset device init flag
                         client_fd_array[i] = 0;                             // reset file descriptor value
@@ -235,18 +237,12 @@ int main(int argc, char **argv) {
         }
     }
 
-    // print message count
-    for(i = 0; i < config.max_clients; i++) {
-        if (message_count[i] > 0) {
-            printf("Client %d: messages: %lu\n", i, message_count[i]);
-        }
-    }
-
     // close open client sockets
     for(i = 0; i < config.max_clients; i++) {
         if (client_fd_array[i] > 0) {
             client_fd = client_fd_array[i];
-            printf("Closing socket on fd: %d\nReceived %lu messages from %s\n", client_fd, message_count[i], device_name[i]);
+            user_log(LOG_INFO, "Closing socket on fd: %d\n", client_fd);
+            user_log(LOG_INFO, "Received %lu messages from %s\n", message_count[i], device_name[i]);
             close(client_fd);
             device_init[i] = 0;
             client_fd_array[i] = 0;
@@ -285,15 +281,15 @@ int create_log_folder(const char *name) {
 
     // create log folder if does not exits
     if(stat(folder_name, &st) == -1) {
-        printf("Creating log folder '%s'\n", folder_name);
+        user_log(LOG_INFO, "Creating log folder '%s'\n", folder_name);
         ret = mkdir(folder_name, S_IRWXU | S_IRWXG | S_IROTH);
     }
     else {
-        printf("Log folder '%s' exists\n", folder_name);
+        user_log(LOG_INFO, "Log folder '%s' exists\n", folder_name);
     }
 
     if(ret == -1) {
-        perror("mkdir");
+        user_log(LOG_ERR, "Log folder creation failed: %s\n", strerror(errno));
     }
 
     return ret;
