@@ -236,8 +236,10 @@ int main(int argc, char **argv) {
 
                         device_init[i] = 0;                                 // reset device init flag
                         client_fd_array[i] = 0;                             // reset file descriptor value
-                        fclose(log_file_ptr[i]);                            // close log file and reset file pointer
-                        log_file_ptr[i] = NULL;
+                        if(log_file_ptr[i] != NULL) {
+                            fclose(log_file_ptr[i]);                        // close log file and reset file pointer
+                            log_file_ptr[i] = NULL;
+                        }
                     }
                 }
             }
@@ -253,8 +255,10 @@ int main(int argc, char **argv) {
             close(client_fd);
             device_init[i] = 0;
             client_fd_array[i] = 0;
-            fclose(log_file_ptr[i]);                            // close log file and reset file pointer
-            log_file_ptr[i] = NULL;
+            if(log_file_ptr[i] != NULL) {
+                fclose(log_file_ptr[i]);    // close log file and reset file pointer
+                log_file_ptr[i] = NULL;
+            }
         }
     }
 
