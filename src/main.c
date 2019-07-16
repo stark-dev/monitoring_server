@@ -163,7 +163,7 @@ int main(int argc, char **argv) {
             user_log(LOG_INFO, "No incoming connections: select timeout reached\n");
         }
         else {
-            if FD_ISSET(server_fd, &read_fds) {                             // server socket fd set -> incoming connection
+            if(FD_ISSET(server_fd, &read_fds)) {                             // server socket fd set -> incoming connection
                 // accept and assign new fd to client
                 if((client_fd = accept(server_fd, (struct sockaddr*)&client_socket, &client_socket_len)) < 0) {
                     user_log(LOG_ERR, "Socket accept failed: %s\n", strerror(errno));
