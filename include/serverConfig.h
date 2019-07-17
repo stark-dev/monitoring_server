@@ -24,6 +24,9 @@
 #define RET_SUCCESS     0
 #define RET_ERROR       1
 
+/* options limits */
+#define MAX_CLIENTS     128                 // maximum number of clients accepted
+
 /* ip address */
 #define ADDR_SIZE       16
 

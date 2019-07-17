@@ -133,7 +133,7 @@ int check_pair(serverConfig *cfg, const char *key_p, const char *value_p) {
     // check max client opition
     if (strcmp(key, "MAX_CLIENTS") == 0) {
         u_value = (unsigned int) atoi(value);
-        if(u_value == 0) { 
+        if(u_value == 0 || u_value > MAX_CLIENTS) { 
             syslog(LOG_ERR, "Invalid value for max_clients option.\n");
             ret_value = RET_ERROR;
         }
