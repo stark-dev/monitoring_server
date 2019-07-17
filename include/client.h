@@ -6,7 +6,7 @@
 *******************************************************************************/
 
 /* connection */
-#define MAX_CLIENTS 10          // max concurrent clients
+#define MAX_CLIENTS 30          // max concurrent clients
 #define MAX_MSG_LEN 1000        // max message length
 
 #define DEST_ADDR   "127.0.0.1" // server address
