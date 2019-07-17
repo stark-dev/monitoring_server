@@ -43,13 +43,13 @@ int read_config(serverConfig *cfg) {
     init_config(cfg);
     memcpy(&local_cfg, cfg, sizeof(serverConfig));
 
-    user_log(LOG_INFO, "Reading configuration from config file %s\n", CONFIG_FILE_PATH);
+    syslog(LOG_INFO, "Reading configuration from config file %s\n", CONFIG_FILE_PATH);
 
     // open config file
     cfg_fp = fopen(CONFIG_FILE_PATH, "r");
 
     if(cfg_fp == NULL) {       // file error
-        user_log(LOG_ERR, "Error reading configuration file: %s\n", strerror(errno));
+        syslog(LOG_ERR, "Error reading configuration file: %s\n", strerror(errno));
         ret_value = RET_ERROR;
     }
     else {
@@ -74,12 +74,12 @@ int read_config(serverConfig *cfg) {
 
                         // check iv key value pair is a valid option
                         if((check_pair(&local_cfg, key_p, value_p)) != RET_SUCCESS) {
-                            user_log(LOG_ERR, "Invalid option at line %u\n", line_count);
+                            syslog(LOG_ERR, "Invalid option at line %u\n", line_count);
                             ret_value = RET_ERROR;
                         }
                     }
                     else {
-                        user_log(LOG_ERR, "Invalid option at line %u\n", line_count);
+                        syslog(LOG_ERR, "Invalid option at line %u\n", line_count);
                         ret_value = RET_ERROR;
                     }
 
@@ -91,7 +91,7 @@ int read_config(serverConfig *cfg) {
 
         // check error returned by getline
         if((rd_count == -1) && (errno == EINVAL || errno == ENOMEM)) {
-            user_log(LOG_ERR, "Error reading configuration file: %s\n", strerror(errno));
+            syslog(LOG_ERR, "Error reading configuration file: %s\n", strerror(errno));
             ret_value = RET_ERROR;
         }
 
@@ -134,42 +134,42 @@ int check_pair(serverConfig *cfg, const char *key_p, const char *value_p) {
     if (strcmp(key, "MAX_CLIENTS") == 0) {
         u_value = (unsigned int) atoi(value);
         if(u_value == 0) { 
-            user_log(LOG_ERR, "Invalid value for max_clients option.\n");
+            syslog(LOG_ERR, "Invalid value for max_clients option.\n");
             ret_value = RET_ERROR;
         }
         else {
             cfg->max_clients = u_value;
-            user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+            syslog(LOG_INFO, "Set option %-12s:%s\n", key, value);
         }
     }   // check listen port opition
     else if(strcmp(key, "LISTEN_PORT") == 0) {
         u_value = (unsigned int) atoi(value);
         if(u_value == 0 || u_value > 65535){
-            user_log(LOG_ERR, "Invalid value for listen_port option.\n");
+            syslog(LOG_ERR, "Invalid value for listen_port option.\n");
             ret_value = RET_ERROR;
         }
         else {
             cfg->listen_port = (unsigned short) u_value;
-            user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+            syslog(LOG_INFO, "Set option %-12s:%s\n", key, value);
         }
     }   // check listen addr opition
     else if(strcmp(key, "LISTEN_ADDR") == 0) {  // address value is checked by inet_aton
         strncpy(cfg->listen_addr, value, ADDR_SIZE - 1);
-        user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+        syslog(LOG_INFO, "Set option %-12s:%s\n", key, value);
     }
     else if(strcmp(key, "LOG_FOLDER") == 0) {
         strncpy(cfg->log_folder, value, MAX_LOG_FOLDER_LEN - 1);
-        user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+        syslog(LOG_INFO, "Set option %-12s:%s\n", key, value);
     }
     else if(strcmp(key, "LOG_LEVEL") == 0) {
         u_value = (unsigned int) atoi(value);
         if(u_value > LOG_DEBUG) {
-            user_log(LOG_ERR, "Invalid value for log_level option.\n");
+            syslog(LOG_ERR, "Invalid value for log_level option.\n");
             ret_value = RET_ERROR;
         }
         else {
             cfg->log_level = (unsigned short) u_value;
-            user_log(LOG_INFO, "Set option %-12s:%s\n", key, value);
+            syslog(LOG_INFO, "Set option %-12s:%s\n", key, value);
         }
     }
     else {  // no valid option

@@ -24,8 +24,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+/* system libraries */
+#include <syslog.h>
+
 /* local includes */
-#include "logger.h"
 #include "rw_utils.h"
 #include "serverConfig.h"
 
@@ -50,5 +52,10 @@
 *******************************************************************************/
 
 int create_log_folder(const char *name);
+
+void set_log_level(int level);
+
+void open_syslog(const char *name);
+void close_syslog();
 
 #endif
