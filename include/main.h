@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <stdint.h>
 
 /* networking libraries */
 #include <netdb.h>
@@ -34,6 +35,9 @@
 /*******************************************************************************
 * constants
 *******************************************************************************/
+
+/* system */
+#define CONSOLE_LOG 1           // enable console log
 
 /* connection */
 #define SELECT_TIMEOUT_SEC 20   // listener select timeout (avoid being stuck if no client connects)

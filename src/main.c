@@ -63,7 +63,7 @@ int main(int argc, char **argv) {
 
     /**************************************************************************/
 
-    // start system logger and register as 'server'
+    // start system logger and register as 'monitoring_server'
     open_syslog("monitoring_server");
 
     // init configuration
@@ -318,7 +318,12 @@ void set_log_level(int level) {
 }
 
 void open_syslog(const char *name) {
-    openlog(name, LOG_PERROR, 0);
+    #if CONSOLE_LOG == 1
+        openlog(name, LOG_PERROR, 0);
+    #else
+        openlog(name, 0, 0);
+    #endif
+    
     syslog(LOG_INFO, "Starting system log\n");
     return;
 }
