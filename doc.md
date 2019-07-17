@@ -12,13 +12,44 @@ make
 ```
 
 ## Description
+`monitoring_server` is a TCP based monitoring application that reads and logs data sent by a set of external devices.
+### Implemented features
+- read and print the number of messages received by each connected device
+- log received data from each device to a separate log file
+- `syslog` integration with log level handling (POSIX compliant)
+- easy run time configuration using a text file
+
+On connection, each device sends a first message with a unique name, which is used to create a dedicated log file. Each following message is measure encoded on a 4 bytes unsigned integer (`uint32_t`). 
+
+### Future improvements
+- multi-thread implementation to improve scalability and handle a greater number of clients
+- encrypted TLS connection and client authentication using PSK
+- log measures to database (i.e., `SQLite`)
+
+## Implementation
+
+## Test
+`monitoring_server` may be tested either with the included `client` (see below) or by using `telnet`. It is sufficient to type
+```
+telnet localhost 1234
+```
+to connect to the server. The first message sent will be saved as the device name. Subsequent messages will be read as 4 bytes integer measures(it may be difficult to send valid data using `telnet`, it is intended only to test connection and message count).
+
+If the maximum number of connected clients is reached, the server application rejects new incoming connections by closing the corresponding file descriptor.
+
+Log messages can be either read on the console output or by opening the system log utility:
+```
+journalctl -fxet server
+```
+
+The application has been tested using the `valgrind` utility to ensure no memory leak is present.
 
 ## System requrirements & Dependencies
 ### System requirements
 
-The application has been built and tested on `Ubuntu 18.04.1 LTS` running on `x86/64` machine.
+The application has been built and tested on `Ubuntu 18.04.1 LTS` running on a `x86/64` machine.
 
-Fair CPU and RAM configuration should not affect the execution.
+CPU and RAM configuration should not affect the execution.
 
 ### Dependencies
 - `build-essentials`
