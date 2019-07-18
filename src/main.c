@@ -86,11 +86,8 @@ int main(int argc, char **argv) {
 
     device_name = (char **) malloc(config.max_clients * sizeof(char *));
     for(i = 0; i < config.max_clients; i++) {
-        device_name[i] = (char *) malloc(MAX_DEV_NAME_LEN * sizeof(char));
+        device_name[i] = (char *) calloc(MAX_DEV_NAME_LEN, sizeof(char));   // initialize to zeros
     }
-
-    // clear read buffer
-    memset((void* ) rd_buffer, 0, MAX_MSG_LEN);
 
     // signal handler
     signal(SIGINT, sigint_handler);    // instantiate signal handler
@@ -113,7 +110,6 @@ int main(int argc, char **argv) {
         message_count[i] = 0;       // reset message count
         device_init[i] = 0;         // reset device init flag
         log_file_ptr[i] = NULL;     // init log file pointers
-        strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);   // set default name for generic device
     }
 
     // socket binding and listening
@@ -194,6 +190,9 @@ int main(int argc, char **argv) {
             for(i = 0; i < config.max_clients; i++) { 
                 client_fd = client_fd_array[i];
 
+                // clear read buffer
+                memset((void* ) rd_buffer, 0, MAX_MSG_LEN);
+
                 if(FD_ISSET(client_fd, &read_fds)) {
                     len = (unsigned int) read(client_fd, rd_buffer, MAX_MSG_LEN - 1); // read data
 
@@ -234,10 +233,11 @@ int main(int argc, char **argv) {
                         syslog(LOG_INFO, "Closing socket on fd: %d\n", client_fd);
                         syslog(LOG_INFO, "Received %lu messages from %s\n", message_count[i], device_name[i]);
 
-                        device_init[i] = 0;                                 // reset device init flag
-                        client_fd_array[i] = 0;                             // reset file descriptor value
+                        device_init[i] = 0;                                     // reset device init flag
+                        client_fd_array[i] = 0;                                 // reset file descriptor value
+                        memset((void *) (device_name[i]), 0, MAX_DEV_NAME_LEN); // clear file name
                         if(log_file_ptr[i] != NULL) {
-                            fclose(log_file_ptr[i]);                        // close log file and reset file pointer
+                            fclose(log_file_ptr[i]);                            // close log file and reset file pointer
                             log_file_ptr[i] = NULL;
                         }
                     }
@@ -255,6 +255,7 @@ int main(int argc, char **argv) {
             close(client_fd);
             device_init[i] = 0;
             client_fd_array[i] = 0;
+            memset((void *) (device_name[i]), 0, MAX_DEV_NAME_LEN);
             if(log_file_ptr[i] != NULL) {
                 fclose(log_file_ptr[i]);    // close log file and reset file pointer
                 log_file_ptr[i] = NULL;
