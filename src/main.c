@@ -200,9 +200,13 @@ int main(int argc, char **argv) {
                         // first message from device, set name
                         if(!device_init[i]) {
                             token = strtok((char *) rd_buffer, delim);      // remove trailing CR/LF
-                            syslog(LOG_INFO, "Device on fd %d registered as %s\n", client_fd, token);
+                            if(token == NULL) {
+                                strncpy(device_name[i], "dev", MAX_DEV_NAME_LEN - 1);
+                            } else {
+                                strncpy(device_name[i], token, MAX_DEV_NAME_LEN - 1);
+                            }
+                            syslog(LOG_INFO, "Device on fd %d registered as %s\n", client_fd, device_name[i]);
 
-                            strncpy(device_name[i], token, MAX_DEV_NAME_LEN - 1);
                             device_init[i] = 1;
                             message_count[i] = 0;                           // reset message count for current client
 
