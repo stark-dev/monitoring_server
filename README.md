@@ -2,7 +2,7 @@
 
 ## TL;DR
 ```
-git clone git@github.com:stark-dev/monitoring_server.git
+git clone https://github.com/stark-dev/monitoring_server.git
 cd monitoring_server
 mkdir build && cd build
 cmake ..
@@ -46,7 +46,7 @@ CPU usage and memory footprint are typically very low.
 
 1. First, clone the repository from GitHub and switch to `master` branch (be sure it is up to date)
 ```
-git clone git@github.com:stark-dev/monitoring_server.git
+git clone https://github.com/stark-dev/monitoring_server.git
 cd monitoring_server
 git checkout master
 git pull
